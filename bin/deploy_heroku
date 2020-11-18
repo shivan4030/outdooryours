@@ -1,0 +1,28 @@
+!/usr/bin/env bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+SHA=$(git rev-parse --short HEAD)
+
+function finish {
+  git reset --hard $SHA
+  bin/bootstrap
+}
+trap finish EXIT
+
+RAILS_ENV=production bundle exec rake assets:precompile
+
+git add -f public/assets
+git add -f config/assets
+
+rsync `readlink config/secrets.yml` config/secrets.yml
+git add -f config/secrets.yml
+
+git commit -m "parent sha: [$SHA] add precompile files"
+
+git push -f heroku master
+
+heroku run rails db:migrate
+heroku run rails db:seed
